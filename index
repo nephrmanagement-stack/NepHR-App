@@ -13,7 +13,7 @@
 </head>
 <body>
     <!-- यहाँ तपाईंको Google Apps Script को Executable Link हाल्नुहोस् -->
-    <iframe src="तपाईंको_GAS_URL_यहाँ_पेस्ट_गर्नुहोस्" allow="geolocation"></iframe>
+    <iframe src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
     
     <script>
         if ('serviceWorker' in navigator) {
