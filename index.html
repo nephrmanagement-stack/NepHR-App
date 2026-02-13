@@ -11,85 +11,117 @@
     <link rel="apple-touch-icon" href="icon.png">
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
-        /* Splash & Biometric UI */
         #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #508C7F; display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 9999;
             color: white; text-align: center;
         }
-        #gatekeeper img { width: 100px; height: 100px; margin-bottom: 20px; border-radius: 22%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .status-text { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
-        .sub-text { font-size: 14px; opacity: 0.8; padding: 0 40px; }
+        #gatekeeper img { width: 90px; height: 90px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         
-        .unlock-btn {
-            margin-top: 30px; padding: 12px 30px; background: white; color: #508C7F;
-            border: none; border-radius: 50px; font-weight: bold; font-size: 16px;
-            cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        .unlock-area {
+            padding: 20px;
+            cursor: pointer;
+            border-radius: 15px;
+            transition: background 0.3s;
         }
+        .unlock-area:active { background: rgba(255,255,255,0.1); }
+
+        .icon-circle {
+            width: 70px; height: 70px; border: 2px solid white;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; margin: 0 auto 20px;
+            font-size: 30px;
+        }
+
+        h2 { font-size: 22px; margin: 0 0 10px; font-weight: 600; }
+        p { font-size: 15px; opacity: 0.8; margin: 0; }
 
         iframe { width: 100%; height: 100%; border: none; display: none; }
     </style>
+    <!-- Font Awesome for the fingerprint icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
     <div id="gatekeeper">
-        <img src="icon.png" alt="App Logo">
-        <div id="ui-content">
-            <p class="status-text">Securing your session...</p>
-            <p class="sub-text">Please verify your identity to access NepHR.</p>
+        <img src="icon.png" alt="Logo">
+        
+        <div class="unlock-area" id="trigger-btn">
+            <div class="icon-circle">
+                <i class="fas fa-fingerprint"></i>
+            </div>
+            <h2 id="msg-title">Tap to Unlock</h2>
+            <p id="msg-body">Verify identity to access NepHR</p>
         </div>
-        <button id="manual-unlock" class="unlock-btn" onclick="requestBiometrics()">Unlock App</button>
     </div>
 
-    <!-- Your Google Apps Script URL here -->
+    <!-- Your Google Apps Script URL -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
 
     <script>
         const frame = document.getElementById('appFrame');
         const gatekeeper = document.getElementById('gatekeeper');
-        const statusText = document.querySelector('.status-text');
-        const unlockBtn = document.getElementById('manual-unlock');
+        const triggerBtn = document.getElementById('trigger-btn');
+        const msgTitle = document.getElementById('msg-title');
 
-        // Check if device is Mobile (iOS or Android)
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         window.onload = function() {
-            if (isMobile) {
-                // If Mobile, start Biometric Process
-                requestBiometrics();
-            } else {
-                // If Desktop/Laptop, skip Biometrics and load immediately
-                statusText.innerText = "Loading Desktop Version...";
+            if (!isMobile) {
+                // If on Desktop, bypass security immediately
                 loadSystem();
+            } else {
+                // If on Mobile, wait for user to tap the "Unlock" area
+                triggerBtn.onclick = requestBiometric;
             }
         };
 
-        async function requestBiometrics() {
-            // Using the WebAuthn API to trigger Fingerprint/FaceID/Passcode
-            if (window.PublicKeyCredential) {
+        async function requestBiometric() {
+            // Check if Biometric hardware is available
+            if (window.PublicKeyCredential && 
+                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+                
                 try {
-                    statusText.innerText = "Authenticating...";
+                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
                     
-                    // This triggers the native phone unlock screen
-                    // We use a dummy challenge just to wake up the biometric hardware
-                    const challenge = new Uint8Array(32);
-                    window.crypto.getRandomValues(challenge);
-                    
-                    // Logic: If user unlocks the phone successfully, load the app
-                    // This creates a security layer on the app launch
-                    loadSystem();
+                    if (available) {
+                        // This forces the iOS/Android native security prompt
+                        const challenge = crypto.getRandomValues(new Uint8Array(32));
+                        const dummyCredential = await navigator.credentials.create({
+                            publicKey: {
+                                challenge,
+                                rp: { name: "NepHR System" },
+                                user: {
+                                    id: crypto.getRandomValues(new Uint8Array(16)),
+                                    name: "user@nephr.local",
+                                    displayName: "NepHR User"
+                                },
+                                pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                                authenticatorSelection: {
+                                    authenticatorAttachment: "platform",
+                                    userVerification: "required"
+                                },
+                                timeout: 60000
+                            }
+                        });
 
+                        // If the promise is not rejected, it means the user was verified
+                        if (dummyCredential) {
+                            loadSystem();
+                        }
+                    } else {
+                        loadSystem(); // Fallback if no biometric set up on phone
+                    }
                 } catch (err) {
-                    console.error("Biometric failed", err);
-                    statusText.innerText = "Authentication Required";
-                    unlockBtn.style.display = "block";
+                    console.error("Biometric Error:", err);
+                    // If user cancels, we show a message but stay on lock screen
+                    msgTitle.innerText = "Try Again";
                 }
             } else {
-                // Fallback for older mobile browsers
-                loadSystem();
+                loadSystem(); // Fallback for browsers without WebAuthn
             }
         }
 
