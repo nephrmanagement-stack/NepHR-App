@@ -4,21 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NepHR App</title>
-    <link rel="apple-touch-icon" href="icon.png?v=1">
-    <link rel="manifest" href="manifest.json">
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#508C7F">
+    
+    <!-- iOS Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <style>
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; }
         iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
-    <!-- यहाँ तपाईंको Google Apps Script को Executable Link हाल्नुहोस् -->
     <iframe src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
     
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW registered!', reg))
+                .catch(err => console.log('SW error!', err));
+            });
         }
     </script>
 </body>
