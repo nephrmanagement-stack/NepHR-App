@@ -5,134 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NepHR App</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#508C7F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon.png">
-
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, system-ui, sans-serif; }
         #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #508C7F; display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 9999;
-            color: white; text-align: center;
+            color: white; text-align: center; display: none;
         }
-        #gatekeeper img { width: 90px; height: 90px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        
-        .unlock-area {
-            padding: 20px;
-            cursor: pointer;
-            border-radius: 15px;
-            transition: background 0.3s;
-        }
-        .unlock-area:active { background: rgba(255,255,255,0.1); }
-
-        .icon-circle {
-            width: 70px; height: 70px; border: 2px solid white;
-            border-radius: 50%; display: flex; align-items: center;
-            justify-content: center; margin: 0 auto 20px;
-            font-size: 30px;
-        }
-
-        h2 { font-size: 22px; margin: 0 0 10px; font-weight: 600; }
-        p { font-size: 15px; opacity: 0.8; margin: 0; }
-
-        iframe { width: 100%; height: 100%; border: none; display: none; }
+        .unlock-btn { padding: 20px; cursor: pointer; }
+        .icon-circle { width: 70px; height: 70px; border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 30px; }
+        iframe { width: 100%; height: 100%; border: none; }
     </style>
-    <!-- Font Awesome for the fingerprint icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
     <div id="gatekeeper">
-        <img src="icon.png" alt="Logo">
-        
-        <div class="unlock-area" id="trigger-btn">
-            <div class="icon-circle">
-                <i class="fas fa-fingerprint"></i>
-            </div>
-            <h2 id="msg-title">Tap to Unlock</h2>
-            <p id="msg-body">Verify identity to access NepHR</p>
+        <img src="icon.png" style="width:90px; border-radius:20px; margin-bottom:25px;">
+        <div class="unlock-btn" onclick="requestBiometric()">
+            <div class="icon-circle"><i class="fas fa-fingerprint"></i></div>
+            <h2>Unlock NepHR</h2>
+            <p>Touch sensor to sign in</p>
         </div>
     </div>
 
-    <!-- Your Google Apps Script URL -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
 
     <script>
         const frame = document.getElementById('appFrame');
         const gatekeeper = document.getElementById('gatekeeper');
-        const triggerBtn = document.getElementById('trigger-btn');
-        const msgTitle = document.getElementById('msg-title');
-
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const savedToken = localStorage.getItem('sessionToken');
 
         window.onload = function() {
-            if (!isMobile) {
-                // If on Desktop, bypass security immediately
-                loadSystem();
+            if (isMobile && savedToken) {
+                // If Mobile and we have a saved login, show Biometric Gate
+                gatekeeper.style.display = 'flex';
+                requestBiometric();
             } else {
-                // If on Mobile, wait for user to tap the "Unlock" area
-                triggerBtn.onclick = requestBiometric;
+                // If Laptop OR first time login, load system normally
+                loadSystem();
             }
         };
 
+        // Trigger Phone hardware security
         async function requestBiometric() {
-            // Check if Biometric hardware is available
-            if (window.PublicKeyCredential && 
-                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-                
+            if (window.PublicKeyCredential) {
                 try {
-                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-                    
-                    if (available) {
-                        // This forces the iOS/Android native security prompt
-                        const challenge = crypto.getRandomValues(new Uint8Array(32));
-                        const dummyCredential = await navigator.credentials.create({
-                            publicKey: {
-                                challenge,
-                                rp: { name: "NepHR System" },
-                                user: {
-                                    id: crypto.getRandomValues(new Uint8Array(16)),
-                                    name: "user@nephr.local",
-                                    displayName: "NepHR User"
-                                },
-                                pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                                authenticatorSelection: {
-                                    authenticatorAttachment: "platform",
-                                    userVerification: "required"
-                                },
-                                timeout: 60000
-                            }
-                        });
+                    const challenge = crypto.getRandomValues(new Uint8Array(32));
+                    await navigator.credentials.get({
+                        publicKey: { challenge, timeout: 60000, userVerification: "required" }
+                    });
+                    // On Success: Tell HR System to auto-login with saved token
+                    loadSystem(savedToken);
+                } catch (e) { console.log("Biometric cancelled or failed"); }
+            } else { loadSystem(); }
+        }
 
-                        // If the promise is not rejected, it means the user was verified
-                        if (dummyCredential) {
-                            loadSystem();
-                        }
-                    } else {
-                        loadSystem(); // Fallback if no biometric set up on phone
-                    }
-                } catch (err) {
-                    console.error("Biometric Error:", err);
-                    // If user cancels, we show a message but stay on lock screen
-                    msgTitle.innerText = "Try Again";
-                }
-            } else {
-                loadSystem(); // Fallback for browsers without WebAuthn
+        function loadSystem(token = null) {
+            gatekeeper.style.display = 'none';
+            if (token) {
+                // Send the token to the Google Script iframe
+                frame.src = "YOUR_GOOGLE_SCRIPT_URL_HERE" + "?token=" + token;
             }
         }
 
-        function loadSystem() {
-            gatekeeper.style.display = 'none';
-            frame.style.display = 'block';
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
+        // Listen for "Login Successful" from HR System to save the token
+        window.addEventListener("message", (event) => {
+            if (event.data.type === "LOGIN_SUCCESS") {
+                localStorage.setItem('sessionToken', event.data.token);
+            }
+        });
     </script>
 </body>
 </html>
