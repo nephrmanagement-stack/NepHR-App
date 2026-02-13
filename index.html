@@ -6,136 +6,88 @@
     <title>NepHR App</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#508C7F">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.png">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: sans-serif; }
         #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #508C7F; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 9999;
-            color: white; text-align: center;
+            align-items: center; justify-content: center; z-index: 9999; color: white; text-align: center;
         }
-        #gatekeeper img { width: 90px; height: 90px; margin-bottom: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        
-        .unlock-area {
-            padding: 20px;
-            cursor: pointer;
-            border-radius: 15px;
-            transition: background 0.3s;
+        .unlock-card {
+            background: rgba(255, 255, 255, 0.1); padding: 40px 30px;
+            border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px); width: 80%; max-width: 320px;
         }
-        .unlock-area:active { background: rgba(255,255,255,0.1); }
-
-        .icon-circle {
-            width: 70px; height: 70px; border: 2px solid white;
-            border-radius: 50%; display: flex; align-items: center;
-            justify-content: center; margin: 0 auto 20px;
-            font-size: 30px;
-        }
-
-        h2 { font-size: 22px; margin: 0 0 10px; font-weight: 600; }
-        p { font-size: 15px; opacity: 0.8; margin: 0; }
-
-        iframe { width: 100%; height: 100%; border: none; display: none; }
+        .fingerprint-icon { font-size: 70px; margin-bottom: 20px; cursor: pointer; color: #fff; }
+        h2 { margin: 10px 0; font-size: 22px; }
+        p { opacity: 0.8; font-size: 14px; }
+        #appFrame { width: 100%; height: 100%; border: none; display: none; }
+        .logo-box { background: white; padding: 15px; border-radius: 15px; margin-bottom: 30px; }
+        .logo-box img { height: 35px; }
     </style>
-    <!-- Font Awesome for the fingerprint icon -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
     <div id="gatekeeper">
-        <img src="icon.png" alt="Logo">
-        
-        <div class="unlock-area" id="trigger-btn">
-            <div class="icon-circle">
-                <i class="fas fa-fingerprint"></i>
-            </div>
+        <div class="logo-box">
+             <!-- यहाँ आफ्नो लोगोको लिङ्क राख्नुहोला -->
+            <img src="https://wdertqstelnxutxhkgnp.supabase.co/storage/v1/object/public/branding/nephr-logo.png" alt="NepHR">
+        </div>
+        <div class="unlock-card" id="trigger-btn">
+            <i class="fas fa-fingerprint fingerprint-icon"></i>
             <h2 id="msg-title">Tap to Unlock</h2>
-            <p id="msg-body">Verify identity to access NepHR</p>
+            <p id="msg-body">Use Biometrics to access NepHR</p>
         </div>
     </div>
 
-    <!-- GitHub को index.html मा यो लाइन रिप्लेस गर्नुहोस् -->
-<iframe id="appFrame" 
-        src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" 
-        allow="geolocation; publickey-credentials-get" 
-        style="width:100%; height:100%; border:none;">
-</iframe>
+    <!-- तपाईंको Google Script URL यहाँ हाल्नुहोस् -->
+    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
 
     <script>
         const frame = document.getElementById('appFrame');
         const gatekeeper = document.getElementById('gatekeeper');
-        const triggerBtn = document.getElementById('trigger-btn');
-        const msgTitle = document.getElementById('msg-title');
-
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 2);
 
         window.onload = function() {
             if (!isMobile) {
-                // If on Desktop, bypass security immediately
-                loadSystem();
+                loadSystem(); // ल्यापटपमा सिधै खोल्ने
             } else {
-                // If on Mobile, wait for user to tap the "Unlock" area
-                triggerBtn.onclick = requestBiometric;
+                // मोबाइलमा ट्याप गर्दा बायोमेट्रिक माग्ने
+                document.getElementById('trigger-btn').onclick = requestUnlock;
+                // सुरुमै एक पटक आफै माग्ने कोसिस गर्ने
+                setTimeout(requestUnlock, 500);
             }
         };
 
-        async function requestBiometric() {
-            // Check if Biometric hardware is available
-            if (window.PublicKeyCredential && 
-                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-                
+        async function requestUnlock() {
+            if (window.PublicKeyCredential) {
                 try {
-                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-                    
-                    if (available) {
-                        // This forces the iOS/Android native security prompt
-                        const challenge = crypto.getRandomValues(new Uint8Array(32));
-                        const dummyCredential = await navigator.credentials.create({
-                            publicKey: {
-                                challenge,
-                                rp: { name: "NepHR System" },
-                                user: {
-                                    id: crypto.getRandomValues(new Uint8Array(16)),
-                                    name: "user@nephr.local",
-                                    displayName: "NepHR User"
-                                },
-                                pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                                authenticatorSelection: {
-                                    authenticatorAttachment: "platform",
-                                    userVerification: "required"
-                                },
-                                timeout: 60000
-                            }
-                        });
-
-                        // If the promise is not rejected, it means the user was verified
-                        if (dummyCredential) {
-                            loadSystem();
+                    const challenge = crypto.getRandomValues(new Uint8Array(32));
+                    const options = {
+                        publicKey: {
+                            challenge,
+                            rp: { name: "NepHR" },
+                            user: { id: challenge, name: "user", displayName: "User" },
+                            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                            authenticatorSelection: { userVerification: "required" },
+                            timeout: 60000
                         }
-                    } else {
-                        loadSystem(); // Fallback if no biometric set up on phone
-                    }
+                    };
+                    await navigator.credentials.create(options);
+                    loadSystem();
                 } catch (err) {
-                    console.error("Biometric Error:", err);
-                    // If user cancels, we show a message but stay on lock screen
-                    msgTitle.innerText = "Try Again";
+                    console.error(err);
+                    document.getElementById('msg-title').innerText = "Try Again";
                 }
             } else {
-                loadSystem(); // Fallback for browsers without WebAuthn
+                loadSystem(); // बायोमेट्रिक नभएमा सिधै खोल्ने
             }
         }
 
         function loadSystem() {
             gatekeeper.style.display = 'none';
             frame.style.display = 'block';
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
         }
     </script>
 </body>
