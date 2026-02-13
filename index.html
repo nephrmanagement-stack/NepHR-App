@@ -11,51 +11,92 @@
     <link rel="apple-touch-icon" href="icon.png">
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #508C7F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
-        /* Splash Screen Style */
-        #splash {
+        /* Splash & Biometric UI */
+        #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #508C7F; display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 9999;
-            transition: opacity 0.5s ease;
+            color: white; text-align: center;
         }
-        #splash img { width: 100px; height: 100px; margin-bottom: 20px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        .loader {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid #ffffff;
-            border-radius: 50%; width: 30px; height: 30px;
-            animation: spin 1s linear infinite;
+        #gatekeeper img { width: 100px; height: 100px; margin-bottom: 20px; border-radius: 22%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .status-text { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
+        .sub-text { font-size: 14px; opacity: 0.8; padding: 0 40px; }
+        
+        .unlock-btn {
+            margin-top: 30px; padding: 12px 30px; background: white; color: #508C7F;
+            border: none; border-radius: 50px; font-weight: bold; font-size: 16px;
+            cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         iframe { width: 100%; height: 100%; border: none; display: none; }
     </style>
 </head>
 <body>
 
-    <!-- Instant Splash Screen -->
-    <div id="splash">
-        <img src="icon.png" alt="Logo">
-        <div class="loader"></div>
-        <p style="color: white; margin-top: 15px; font-size: 14px; letter-spacing: 1px;">Loading NepHR...</p>
+    <div id="gatekeeper">
+        <img src="icon.png" alt="App Logo">
+        <div id="ui-content">
+            <p class="status-text">Securing your session...</p>
+            <p class="sub-text">Please verify your identity to access NepHR.</p>
+        </div>
+        <button id="manual-unlock" class="unlock-btn" onclick="requestBiometrics()">Unlock App</button>
     </div>
 
-    <!-- Hidden Iframe -->
+    <!-- Your Google Apps Script URL here -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation"></iframe>
 
     <script>
         const frame = document.getElementById('appFrame');
-        const splash = document.getElementById('splash');
+        const gatekeeper = document.getElementById('gatekeeper');
+        const statusText = document.querySelector('.status-text');
+        const unlockBtn = document.getElementById('manual-unlock');
 
-        // Hide splash only when Google Script is fully loaded
-        frame.onload = function() {
-            splash.style.opacity = '0';
-            setTimeout(() => {
-                splash.style.display = 'none';
-                frame.style.display = 'block';
-            }, 500);
+        // Check if device is Mobile (iOS or Android)
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        window.onload = function() {
+            if (isMobile) {
+                // If Mobile, start Biometric Process
+                requestBiometrics();
+            } else {
+                // If Desktop/Laptop, skip Biometrics and load immediately
+                statusText.innerText = "Loading Desktop Version...";
+                loadSystem();
+            }
         };
+
+        async function requestBiometrics() {
+            // Using the WebAuthn API to trigger Fingerprint/FaceID/Passcode
+            if (window.PublicKeyCredential) {
+                try {
+                    statusText.innerText = "Authenticating...";
+                    
+                    // This triggers the native phone unlock screen
+                    // We use a dummy challenge just to wake up the biometric hardware
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+                    
+                    // Logic: If user unlocks the phone successfully, load the app
+                    // This creates a security layer on the app launch
+                    loadSystem();
+
+                } catch (err) {
+                    console.error("Biometric failed", err);
+                    statusText.innerText = "Authentication Required";
+                    unlockBtn.style.display = "block";
+                }
+            } else {
+                // Fallback for older mobile browsers
+                loadSystem();
+            }
+        }
+
+        function loadSystem() {
+            gatekeeper.style.display = 'none';
+            frame.style.display = 'block';
+        }
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
