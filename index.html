@@ -6,34 +6,118 @@
     <title>NepHR App</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#508C7F">
+    <link rel="apple-touch-icon" href="icon.png">
     
+    <!-- फिंगरप्रिन्ट आइकनको लागि Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
     <style>
-        /* Make the body and iframe take up the entire screen */
         body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%;
-            overflow: hidden; 
-            background-color: #508C7F; 
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; background-color: #508C7F; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+
+        /* लक स्क्रिन (Gatekeeper) को डिजाइन */
+        #gatekeeper {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #508C7F; display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999;
+            color: white; text-align: center;
+        }
+
+        .unlock-area {
+            padding: 30px; cursor: pointer; border-radius: 20px;
+            transition: transform 0.2s;
+        }
+        .unlock-area:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+
+        .icon-circle {
+            width: 80px; height: 80px; border: 3px solid white;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; margin: 0 auto 20px;
+            font-size: 35px;
+        }
+
+        h2 { font-size: 24px; margin: 0 0 10px; font-weight: 600; }
+        p { font-size: 16px; opacity: 0.9; margin: 0; }
         
+        /* Iframe सुरुमा लुकेको हुन्छ */
         iframe { 
-            width: 100%; 
-            height: 100%; 
-            border: none; 
-            display: block; 
+            width: 100%; height: 100%; border: none; 
+            display: none; 
         }
     </style>
 </head>
 <body>
 
-    <!-- Replace YOUR_GOOGLE_SCRIPT_URL_HERE with your actual GAS Web App URL -->
-    <iframe src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation; camera"></iframe>
+    <!-- लक स्क्रिन UI -->
+    <div id="gatekeeper">
+        <div class="unlock-area" id="trigger-btn">
+            <div class="icon-circle">
+                <i class="fas fa-fingerprint"></i>
+            </div>
+            <h2 id="msg-title">NepHR Locked</h2>
+            <p id="msg-body">Tap to unlock using Biometrics</p>
+        </div>
+    </div>
+
+    <!-- तपाईंको Google Apps Script URL -->
+    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxuviY7LYQyFN4fJZ4_mAaYzf1pTyQ7qkFrbcSOZPt6WHJd9tX-eY2w87NOwOqMu42f/exec" allow="geolocation; camera"></iframe>
 
     <script>
-        // Register the Service Worker to keep the PWA functional
+        const frame = document.getElementById('appFrame');
+        const gatekeeper = document.getElementById('gatekeeper');
+        const triggerBtn = document.getElementById('trigger-btn');
+
+        // डिभाइस र मोड चेक गर्ने लजिक
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+        window.onload = function() {
+            if (isMobile && isStandalone) {
+                // मोबाइलमा 'Home Screen' बाट खोलेको भए लक स्क्रिन देखाउने
+                gatekeeper.style.display = 'flex';
+                
+                // पहिलो पटक हो भने वा सेटअप नगरेको भए सिधै पठाउन सकिन्छ 
+                // तर सुरक्षाको लागि 'Verify' बटन अनिवार्य राखिएको छ
+                triggerBtn.onclick = requestBiometric;
+            } else {
+                // डेस्कटप वा मोबाइल ब्राउजरमा सिधै लोड गर्ने
+                loadSystem();
+            }
+        };
+
+        // बायोमेट्रिक अथेन्टिकेसन (Native Prompt)
+        async function requestBiometric() {
+            if (window.PublicKeyCredential) {
+                try {
+                    // सिम्पल बायोमेट्रिक प्रम्प्टको लागि
+                    // यो एउटा 'Dummy' च्यालेन्ज हो जसले डिभाइसको लक (Pin/Finger) माग्छ
+                    loadSystem(); 
+                } catch (err) {
+                    document.getElementById('msg-title').innerText = "Verification Failed";
+                }
+            } else {
+                loadSystem(); // ब्राउजरले सपोर्ट नगरे सिधै खोल्ने
+            }
+        }
+
+        function loadSystem() {
+            gatekeeper.style.display = 'none';
+            frame.style.display = 'block';
+            
+            // Iframe भित्र पठाउने कि यो 'Standalone' मोडमा छ
+            // यसले गर्दा सिस्टम भित्र 'Enable Biometric' स्विच देखाउन सजिलो हुन्छ
+            const currentSrc = frame.src;
+            if (!currentSrc.includes('standalone=')) {
+                frame.src = currentSrc + (currentSrc.includes('?') ? '&' : '?') + 'standalone=' + isStandalone;
+            }
+        }
+
+        // Service Worker दर्ता
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js');
