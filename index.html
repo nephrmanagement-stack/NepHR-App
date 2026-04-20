@@ -10,7 +10,6 @@
     <meta name="theme-color" content="#508C7F">
     <link rel="apple-touch-icon" href="icon.png">
     
-    <!-- फिंगरप्रिन्ट आइकनको लागि Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
@@ -20,88 +19,122 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
-        /* लक स्क्रिन (Gatekeeper) को डिजाइन */
         #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #508C7F; display: none; flex-direction: column;
+            background: #508C7F; display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 9999;
             color: white; text-align: center;
         }
 
         .unlock-area {
-            padding: 30px; cursor: pointer; border-radius: 20px;
-            transition: transform 0.2s;
+            padding: 40px; cursor: pointer; border-radius: 30px;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.05);
         }
-        .unlock-area:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+        .unlock-area:active { transform: scale(0.95); background: rgba(255,255,255,0.15); }
 
         .icon-circle {
-            width: 80px; height: 80px; border: 3px solid white;
+            width: 100px; height: 100px; border: 4px solid white;
             border-radius: 50%; display: flex; align-items: center;
-            justify-content: center; margin: 0 auto 20px;
-            font-size: 35px;
+            justify-content: center; margin: 0 auto 25px;
+            font-size: 45px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
 
-        h2 { font-size: 24px; margin: 0 0 10px; font-weight: 600; }
-        p { font-size: 16px; opacity: 0.9; margin: 0; }
+        h2 { font-size: 26px; margin: 0 0 10px; font-weight: 700; }
+        p { font-size: 16px; opacity: 0.8; margin: 0; }
         
-        /* Iframe सुरुमा लुकेको हुन्छ */
         iframe { 
             width: 100%; height: 100%; border: none; 
             display: none; 
         }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite;
+            display: none; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <!-- लक स्क्रिन UI -->
     <div id="gatekeeper">
         <div class="unlock-area" id="trigger-btn">
             <div class="icon-circle">
                 <i class="fas fa-fingerprint"></i>
             </div>
             <h2 id="msg-title">NepHR Locked</h2>
-            <p id="msg-body">Tap to unlock using Biometrics</p>
+            <p id="msg-body">Tap to unlock using Device Biometrics</p>
+            <div class="loader" id="loading-spinner"></div>
         </div>
     </div>
 
-    <!-- तपाईंको Google Apps Script URL -->
-    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" allow="geolocation; camera"></iframe>
-    
+    <!-- Google Apps Script URL -->
+    <iframe id="appFrame" 
+            src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" 
+            allow="geolocation; camera; publickey-credentials-get"></iframe>
+
     <script>
         const frame = document.getElementById('appFrame');
         const gatekeeper = document.getElementById('gatekeeper');
         const triggerBtn = document.getElementById('trigger-btn');
+        const spinner = document.getElementById('loading-spinner');
 
-        // डिभाइस र मोड चेक गर्ने लजिक
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
         window.onload = function() {
-            if (isMobile && isStandalone) {
-                // मोबाइलमा 'Home Screen' बाट खोलेको भए लक स्क्रिन देखाउने
+            // यदि PWA मोडमा छ भने मात्र लक स्क्रिन देखाउने
+            if (isStandalone) {
                 gatekeeper.style.display = 'flex';
-                
-                // पहिलो पटक हो भने वा सेटअप नगरेको भए सिधै पठाउन सकिन्छ 
-                // तर सुरक्षाको लागि 'Verify' बटन अनिवार्य राखिएको छ
-                triggerBtn.onclick = requestBiometric;
+                triggerBtn.onclick = handleBiometricUnlock;
             } else {
-                // डेस्कटप वा मोबाइल ब्राउजरमा सिधै लोड गर्ने
                 loadSystem();
             }
         };
 
-        // बायोमेट्रिक अथेन्टिकेसन (Native Prompt)
-        async function requestBiometric() {
+        async function handleBiometricUnlock() {
+            // १. चेक गर्ने ब्राउजरले बायोमेट्रिक सपोर्ट गर्छ कि गर्दैन
             if (window.PublicKeyCredential) {
                 try {
-                    // सिम्पल बायोमेट्रिक प्रम्प्टको लागि
-                    // यो एउटा 'Dummy' च्यालेन्ज हो जसले डिभाइसको लक (Pin/Finger) माग्छ
-                    loadSystem(); 
+                    spinner.style.display = 'block';
+                    
+                    // Native Device Prompt (Fingerprint/FaceID/Pin)
+                    // यसले मोबाइलको आफ्नो सुरक्षा प्रणालीलाई सक्रिय बनाउँछ
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+
+                    const options = {
+                        publicKey: {
+                            challenge: challenge,
+                            rp: { name: "NepHR" },
+                            user: {
+                                id: new Uint8Array([1, 2, 3, 4]),
+                                name: "user@nephr",
+                                displayName: "NepHR User"
+                            },
+                            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                            authenticatorSelection: { userVerification: "required" },
+                            timeout: 60000
+                        }
+                    };
+
+                    // यो लाइनले फिंगरप्रिन्ट पपअप खोल्छ
+                    await navigator.credentials.create(options);
+                    
+                    loadSystem();
                 } catch (err) {
-                    document.getElementById('msg-title').innerText = "Verification Failed";
+                    console.error("Biometric Error:", err);
+                    spinner.style.display = 'none';
+                    document.getElementById('msg-title').innerText = "Unlock Failed";
+                    document.getElementById('msg-body').innerText = "Please try again or use Device PIN";
                 }
             } else {
-                loadSystem(); // ब्राउजरले सपोर्ट नगरे सिधै खोल्ने
+                // यदि ब्राउजर पुरानो छ भने सिधै लोड गर्ने
+                loadSystem();
             }
         }
 
@@ -109,19 +142,16 @@
             gatekeeper.style.display = 'none';
             frame.style.display = 'block';
             
-            // Iframe भित्र पठाउने कि यो 'Standalone' मोडमा छ
-            // यसले गर्दा सिस्टम भित्र 'Enable Biometric' स्विच देखाउन सजिलो हुन्छ
+            // Iframe URL मा Standalone मोड पठाउने
             const currentSrc = frame.src;
             if (!currentSrc.includes('standalone=')) {
-                frame.src = currentSrc + (currentSrc.includes('?') ? '&' : '?') + 'standalone=' + isStandalone;
+                frame.src = currentSrc + (currentSrc.includes('?') ? '&' : '?') + 'standalone=true';
             }
         }
 
-        // Service Worker दर्ता
+        // Service Worker
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js');
-            });
+            navigator.serviceWorker.register('sw.js').catch(err => console.log("SW error:", err));
         }
     </script>
 </body>
