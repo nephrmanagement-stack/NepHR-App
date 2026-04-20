@@ -3,77 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NepHR App</title>
+    <title>NepHR PWA</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#508C7F">
-    <link rel="apple-touch-icon" href="icon.png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
+        :root { --primary: #508C7F; }
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%;
-            overflow: hidden; background-color: #508C7F; 
+            overflow: hidden; background-color: var(--primary); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         #gatekeeper {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #508C7F; display: flex; flex-direction: column;
+            background: var(--primary); display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 9999;
             color: white; text-align: center;
         }
 
-        .unlock-area {
-            padding: 40px; cursor: pointer; border-radius: 30px;
-            transition: all 0.3s ease;
-            background: rgba(255,255,255,0.05);
+        .logo-container { margin-bottom: 40px; }
+        .logo-container img { width: 180px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2)); }
+
+        .unlock-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px 30px;
+            border-radius: 25px;
+            width: 85%; max-width: 320px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .unlock-area:active { transform: scale(0.95); background: rgba(255,255,255,0.15); }
 
         .icon-circle {
-            width: 100px; height: 100px; border: 4px solid white;
+            width: 80px; height: 80px; border: 3px solid white;
             border-radius: 50%; display: flex; align-items: center;
-            justify-content: center; margin: 0 auto 25px;
-            font-size: 45px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            justify-content: center; margin: 0 auto 20px;
+            font-size: 35px; cursor: pointer;
+            transition: transform 0.2s;
         }
+        .icon-circle:active { transform: scale(0.9); }
 
-        h2 { font-size: 26px; margin: 0 0 10px; font-weight: 700; }
-        p { font-size: 16px; opacity: 0.8; margin: 0; }
-        
-        iframe { 
-            width: 100%; height: 100%; border: none; 
-            display: none; 
-        }
+        h2 { font-size: 22px; margin: 0 0 10px; font-weight: 600; }
+        p { font-size: 14px; opacity: 0.8; margin: 0 0 25px 0; line-height: 1.4; }
 
-        /* Loading Spinner */
-        .loader {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid white;
-            border-radius: 50%; width: 30px; height: 30px;
-            animation: spin 1s linear infinite;
-            display: none; margin: 20px auto;
+        .btn-bypass {
+            background: white; color: var(--primary);
+            border: none; padding: 12px 25px; border-radius: 12px;
+            font-weight: bold; font-size: 14px; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 100%; transition: 0.2s;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .btn-bypass:active { transform: translateY(2px); }
+
+        iframe { width: 100%; height: 100%; border: none; display: none; }
     </style>
 </head>
 <body>
 
     <div id="gatekeeper">
-        <div class="unlock-area" id="trigger-btn">
-            <div class="icon-circle">
+        <div class="logo-container">
+            <!-- यहाँ तपाईँको NepHR लोगोको URL राख्नुहोला -->
+            <img src="https://placehold.co/200x60/ffffff/508C7F?text=NepHR" alt="Logo">
+        </div>
+
+        <div class="unlock-card">
+            <div class="icon-circle" id="bio-btn">
                 <i class="fas fa-fingerprint"></i>
             </div>
-            <h2 id="msg-title">NepHR Locked</h2>
-            <p id="msg-body">Tap to unlock using Device Biometrics</p>
-            <div class="loader" id="loading-spinner"></div>
+            <h2 id="status-title">System Locked</h2>
+            <p id="status-desc">Use Fingerprint or FaceID to access NepHR App</p>
+            
+            <!-- यदि बायोमेट्रिक बिग्रियो भने सिधै भित्र जाने बटन -->
+            <button class="btn-bypass" onclick="loadSystem()">Login with Password</button>
         </div>
     </div>
 
-    <!-- Google Apps Script URL -->
     <iframe id="appFrame" 
             src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" 
             allow="geolocation; camera; publickey-credentials-get"></iframe>
@@ -81,60 +90,63 @@
     <script>
         const frame = document.getElementById('appFrame');
         const gatekeeper = document.getElementById('gatekeeper');
-        const triggerBtn = document.getElementById('trigger-btn');
-        const spinner = document.getElementById('loading-spinner');
+        const bioBtn = document.getElementById('bio-btn');
 
+        // PWA Mode चेक गर्ने
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 
         window.onload = function() {
-            // यदि PWA मोडमा छ भने मात्र लक स्क्रिन देखाउने
             if (isStandalone) {
+                // PWA मोडमा हुँदा मात्र लक देखाउने
                 gatekeeper.style.display = 'flex';
-                triggerBtn.onclick = handleBiometricUnlock;
+                // एप खोल्ने बित्तिकै प्रम्प्ट देखाउन खोज्ने
+                setTimeout(triggerBiometric, 500);
             } else {
                 loadSystem();
             }
         };
 
-        async function handleBiometricUnlock() {
-            // १. चेक गर्ने ब्राउजरले बायोमेट्रिक सपोर्ट गर्छ कि गर्दैन
-            if (window.PublicKeyCredential) {
-                try {
-                    spinner.style.display = 'block';
-                    
-                    // Native Device Prompt (Fingerprint/FaceID/Pin)
-                    // यसले मोबाइलको आफ्नो सुरक्षा प्रणालीलाई सक्रिय बनाउँछ
-                    const challenge = new Uint8Array(32);
-                    window.crypto.getRandomValues(challenge);
+        bioBtn.onclick = triggerBiometric;
 
-                    const options = {
-                        publicKey: {
-                            challenge: challenge,
-                            rp: { name: "NepHR" },
-                            user: {
-                                id: new Uint8Array([1, 2, 3, 4]),
-                                name: "user@nephr",
-                                displayName: "NepHR User"
-                            },
-                            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                            authenticatorSelection: { userVerification: "required" },
-                            timeout: 60000
-                        }
-                    };
-
-                    // यो लाइनले फिंगरप्रिन्ट पपअप खोल्छ
-                    await navigator.credentials.create(options);
-                    
-                    loadSystem();
-                } catch (err) {
-                    console.error("Biometric Error:", err);
-                    spinner.style.display = 'none';
-                    document.getElementById('msg-title').innerText = "Unlock Failed";
-                    document.getElementById('msg-body').innerText = "Please try again or use Device PIN";
-                }
-            } else {
-                // यदि ब्राउजर पुरानो छ भने सिधै लोड गर्ने
+        async function triggerBiometric() {
+            if (!window.PublicKeyCredential) {
                 loadSystem();
+                return;
+            }
+
+            try {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+
+                // यो एउटा 'Assertion' कल हो जसले मोबाइलको पिन/फिंगरप्रिन्ट माग्छ
+                const options = {
+                    publicKey: {
+                        challenge: challenge,
+                        timeout: 60000,
+                        userVerification: "required",
+                        // यहाँ 'allowCredentials' खाली राख्दा यसले डिभाइसको लोकल क्रेडिन्सियल खोज्छ
+                    }
+                };
+
+                // धेरैजसो एन्ड्रोइडमा 'create' ले 'get' भन्दा राम्रो काम गर्छ 'gatekeeper' को लागि
+                const dummyOptions = {
+                    publicKey: {
+                        challenge: challenge,
+                        rp: { name: "NepHR" },
+                        user: { id: challenge, name: "user", displayName: "User" },
+                        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                        authenticatorSelection: { userVerification: "required" }
+                    }
+                };
+
+                await navigator.credentials.create(dummyOptions);
+                loadSystem();
+
+            } catch (err) {
+                console.error("Biometric failed:", err);
+                document.getElementById('status-title').innerText = "Security Check";
+                document.getElementById('status-desc').innerText = "Biometric was cancelled or not set up.";
+                document.getElementById('status-title').style.color = "#ffbaba";
             }
         }
 
@@ -142,16 +154,15 @@
             gatekeeper.style.display = 'none';
             frame.style.display = 'block';
             
-            // Iframe URL मा Standalone मोड पठाउने
+            // Iframe मा डाटा पठाउने
             const currentSrc = frame.src;
             if (!currentSrc.includes('standalone=')) {
                 frame.src = currentSrc + (currentSrc.includes('?') ? '&' : '?') + 'standalone=true';
             }
         }
 
-        // Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log("SW error:", err));
+            navigator.serviceWorker.register('sw.js');
         }
     </script>
 </body>
