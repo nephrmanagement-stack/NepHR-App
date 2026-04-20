@@ -1,8 +1,9 @@
-const CACHE_NAME = 'nephr-cache-v1';
+const CACHE_NAME = 'nephr-v2';
 const ASSETS = [
+  './',
   './index.html',
   './manifest.json',
-  './icon.png'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ];
 
 self.addEventListener('install', (e) => {
