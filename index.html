@@ -10,45 +10,45 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #508C7F; font-family: sans-serif; }
         #appFrame { width: 100%; height: 100%; border: none; display: block; }
         #offline-ui { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: white; text-align: center; padding: 20px; }
-        .user-avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid white; margin-bottom: 15px; object-fit: cover; background: white; }
+        .user-avatar { width: 100px; height: 100px; border-radius: 50%; border: 4px solid white; margin-bottom: 15px; object-fit: cover; background: #eee; }
         .btn-group { display: flex; gap: 20px; margin-top: 30px; }
-        .off-btn { padding: 18px 30px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; font-size: 18px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 130px; }
-        .in { background: #ffffff; color: #2e7d32; }
-        .out { background: #ffffff; color: #c62828; }
-        .status-msg { margin-top: 25px; font-size: 14px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; min-height: 20px; }
-        #sync-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 5px; display: none; font-size: 13px; z-index: 10000; }
+        .off-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 130px; background: white; }
+        .in { color: #2e7d32; } .out { color: #c62828; }
+        .status-msg { margin-top: 25px; font-size: 14px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
+        #sync-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 30px; display: none; font-size: 13px; z-index: 10000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
-    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" allow="geolocation; camera"></iframe>
+    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxiNhgXHhhEjqZJl9epRs3u5eFR9OU290uB0Ohlc2PkxS-z71GsOFgSshGy37rc-LK5/exec" allow="geolocation; camera"></iframe>
 
     <div id="offline-ui">
         <img id="off-user-photo" src="https://placehold.co/100x100/white/508C7F?text=User" class="user-avatar">
         <h2 id="off-user-name">Welcome</h2>
-        <p style="opacity: 0.9;">Offline Mode</p>
+        <p id="off-sub-text">Offline Mode</p>
         <div class="btn-group">
             <button class="off-btn in" onclick="markOffline('Check-In')"><i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span></button>
             <button class="off-btn out" onclick="markOffline('Check-Out')"><i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span></button>
         </div>
-        <p id="off-status" class="status-msg">Waiting for offline input...</p>
-        <button onclick="location.reload()" style="margin-top:20px; background:none; border:1px solid white; color:white; padding:5px 15px; border-radius:15px; font-size:12px; cursor:pointer;">Retry / Reload</button>
+        <p id="off-status" class="status-msg">Ready to record offline.</p>
+        <button onclick="location.reload()" style="margin-top:20px; background:none; border:1px solid white; color:white; padding:5px 15px; border-radius:15px; font-size:12px; cursor:pointer;">Reload App</button>
     </div>
 
-    <div id="sync-toast">✅ Syncing...</div>
+    <div id="sync-toast">Syncing...</div>
 
     <script>
         const frame = document.getElementById('appFrame');
         const offlineUI = document.getElementById('offline-ui');
         const toast = document.getElementById('sync-toast');
 
-        // १. Iframe बाट मेसेज सुन्ने
+        // १. GAS बाट आउने डाटा प्राप्त गर्ने र सुरक्षित गर्ने
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type === 'SAVE_SESSION') {
-                const userData = JSON.stringify(event.data.user);
-                localStorage.setItem('nephr_session_user', userData);
-                console.log("Session saved to Shell:", userData);
-                showToast("✅ Login Data Secured for Offline");
+                localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
+                console.log("Login data saved locally.");
+                if(navigator.onLine) {
+                    showToast("✅ Login Ready for Offline");
+                }
             }
             
             if (event.data.type === 'SYNC_SUCCESS') {
@@ -58,75 +58,55 @@
             }
         });
 
-        // २. कनेक्सन अनुसार UI बदल्ने
-        function updateConnectivityUI() {
+        // २. इन्टरनेट चेक गरेर UI बदल्ने
+        function updateConnectivity() {
             if (navigator.onLine) {
                 frame.style.display = "block";
                 offlineUI.style.display = "none";
-                setTimeout(triggerSyncIfOnline, 5000); // ५ सेकेन्डपछि सिंक सुरु गर्ने
+                setTimeout(triggerSync, 5000); 
             } else {
                 frame.style.display = "none";
-                const data = localStorage.getItem('nephr_session_user');
-                if (data) {
-                    const user = JSON.parse(data);
+                const savedUser = localStorage.getItem('nephr_session_user');
+                if (savedUser && savedUser !== "undefined") {
+                    const user = JSON.parse(savedUser);
                     document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
+                    document.getElementById('off-sub-text').innerText = "Offline Mode Active";
                     if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
                     offlineUI.style.display = "flex";
                 } else {
-                    // यदि डाटै छैन भने अलि स्पष्ट म्यासेज
-                    document.getElementById('off-user-name').innerText = "First Login Required";
+                    document.getElementById('off-user-name').innerText = "Login Required";
                     document.getElementById('off-status').innerHTML = "कृपया एकपटक अनलाइनमा लगइन गर्नुहोस्।";
                     offlineUI.style.display = "flex";
                 }
             }
         }
 
+        // ३. अफलाइन एटेन्डेन्स सेभ गर्ने
         function markOffline(type) {
-    // १. LocalStorage बाट डाटा तान्ने
-    const rawData = localStorage.getItem('nephr_session_user');
-    
-    // २. यदि डाटा छैन भने एरर म्यासेज देखाउने
-    if (!rawData || rawData === "undefined" || rawData === "null") {
-        alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस् र १० सेकेन्ड पर्खिनुहोस्।");
-        return;
-    }
+            const savedUser = localStorage.getItem('nephr_session_user');
+            if (!savedUser || savedUser === "undefined") {
+                alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस्।");
+                return;
+            }
+            const user = JSON.parse(savedUser);
+            const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
+            
+            queue.push({ 
+                employeeId: user.employeeId, 
+                type: type === 'Check-In' ? 'checkIn' : 'checkOut', 
+                timestamp: Date.now() 
+            });
 
-    try {
-        const user = JSON.parse(rawData);
-        
-        // डाटा चेक गर्ने
-        if (!user || !user.employeeId) {
-            alert("त्रुटि: युजरको जानकारी अपूर्ण छ। कृपया फेरि लगइन गर्नुहोस्।");
-            return;
+            localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
+            document.getElementById('off-status').innerHTML = "✅ " + type + " स्थानीय रूपमा सुरक्षित भयो।";
+            alert(type + " recorded successfully (Offline).");
         }
 
-        const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
-        
-        // ३. क्युमा डाटा थप्ने
-        queue.push({
-            employeeId: user.employeeId,
-            type: type === 'Check-In' ? 'checkIn' : 'checkOut',
-            timestamp: new Date().getTime()
-        });
-
-        // ४. सेभ गर्ने
-        localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-        
-        // ५. UI अपडेट गर्ने
-        document.getElementById('off-status').innerHTML = "✅ " + type + " स्थानीय रूपमा सुरक्षित भयो।";
-        alert(type + " रेकर्ड भयो! इन्टरनेट आएपछि यो स्वतः सिंक हुनेछ।");
-
-    } catch (e) {
-        console.error("Offline Recording Error:", e);
-        alert("सिस्टममा केही समस्या आयो। कृपया रिफ्रेस गर्नुहोस्।");
-    }
-}
-
-        function triggerSyncIfOnline() {
+        function triggerSync() {
             if (!navigator.onLine) return;
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
             if (queue.length > 0) {
-                showToast("🔄 Syncing " + queue.length + " records...");
+                showToast("🔄 Syncing " + queue.length + " items...");
                 frame.contentWindow.postMessage({ type: 'PROCESS_SYNC', data: queue }, "*");
             }
         }
@@ -141,9 +121,9 @@
             window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
         }
 
-        window.addEventListener('online', updateConnectivityUI);
-        window.addEventListener('offline', updateConnectivityUI);
-        window.onload = updateConnectivityUI;
+        window.addEventListener('online', updateConnectivity);
+        window.addEventListener('offline', updateConnectivity);
+        window.onload = updateConnectivity;
     </script>
 </body>
 </html>
