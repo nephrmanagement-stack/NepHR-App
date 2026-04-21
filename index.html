@@ -9,72 +9,80 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #508C7F; font-family: sans-serif; }
         #appFrame { width: 100%; height: 100%; border: none; display: block; }
-        
-        /* Offline Dashboard UI */
         #offline-ui { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: white; text-align: center; padding: 20px; }
-        .user-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid white; margin-bottom: 15px; object-fit: cover; }
-        .btn-group { display: flex; gap: 15px; margin-top: 25px; }
-        .off-btn { padding: 15px 25px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .user-avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid white; margin-bottom: 15px; object-fit: cover; background: white; }
+        .btn-group { display: flex; gap: 20px; margin-top: 30px; }
+        .off-btn { padding: 18px 30px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; font-size: 18px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 130px; }
         .in { background: #ffffff; color: #2e7d32; }
         .out { background: #ffffff; color: #c62828; }
-        .status-msg { margin-top: 20px; font-size: 14px; opacity: 0.8; }
+        .status-msg { margin-top: 25px; font-size: 14px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
     </style>
 </head>
 <body>
 
-    <!-- Online Mode: GAS App Loads Here -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" allow="geolocation; camera"></iframe>
 
-    <!-- Offline Mode UI -->
     <div id="offline-ui">
-        <img id="off-user-photo" src="https://placehold.co/80x80/white/508C7F?text=U" class="user-avatar">
+        <img id="off-user-photo" src="https://placehold.co/100x100/white/508C7F?text=User" class="user-avatar">
         <h2 id="off-user-name">Welcome Back</h2>
-        <p>Offline Mode Active</p>
+        <p style="opacity: 0.9;">You are currently in <b>Offline Mode</b></p>
         
         <div class="btn-group">
-            <button class="off-btn in" onclick="markOffline('checkIn')"><i class="fas fa-sign-in-alt"></i> Check In</button>
-            <button class="off-btn out" onclick="markOffline('checkOut')"><i class="fas fa-sign-out-alt"></i> Check Out</button>
+            <button class="off-btn in" onclick="markOffline('Check-In')"><i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span></button>
+            <button class="off-btn out" onclick="markOffline('Check-Out')"><i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span></button>
         </div>
-        <p id="off-status" class="status-msg">Your attendance will sync when you're back online.</p>
+        <p id="off-status" class="status-msg">Offline attendance will sync when online.</p>
     </div>
 
     <script>
         const frame = document.getElementById('appFrame');
         const offlineUI = document.getElementById('offline-ui');
 
-        // १. कनेक्सन चेक गर्ने र UI बदल्ने
-        function checkConnectivity() {
+        // १. Apps Script बाट आउने लगइन डाटा सुन्ने (Listen)
+        window.addEventListener('message', function(event) {
+            console.log("[PWA Shell] Message received from Iframe:", event.data);
+            
+            if (event.data && event.data.type === 'SAVE_SESSION') {
+                localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
+                console.log("[PWA Shell] User session saved to LocalStorage!");
+            }
+        });
+
+        // २. कनेक्सन अनुसार UI बदल्ने
+        function updateConnectivityUI() {
             if (navigator.onLine) {
-                console.log("[PWA] Online - Showing App Frame");
                 frame.style.display = "block";
                 offlineUI.style.display = "none";
-                // अनलाइन आउँदा पेन्डिङ डाटा सिंक गर्न GAS लाई भन्न सकिन्छ (Optional)
             } else {
-                console.log("[PWA] Offline - Showing Offline UI");
                 frame.style.display = "none";
-                loadOfflineDashboard();
+                showOfflineDashboard();
             }
         }
 
-        // २. अफलाइन डाटा लोड गर्ने
-        function loadOfflineDashboard() {
-            const userData = localStorage.getItem('nephr_session_user');
-            if (userData) {
-                const user = JSON.parse(userData);
+        // ३. अफलाइन ड्यासबोर्ड देखाउने
+        function showOfflineDashboard() {
+            const data = localStorage.getItem('nephr_session_user');
+            if (data) {
+                const user = JSON.parse(data);
                 document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
                 if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
                 offlineUI.style.display = "flex";
             } else {
-                document.body.innerHTML = "<div style='color:white; text-align:center; padding-top:100px;'><h2>Internet Required</h2><p>Please connect to the internet for the first-time login.</p></div>";
+                // यदि डाटा छैन भने (पहिलो पटक लगइन नभएको)
+                document.body.innerHTML = `
+                    <div style="color:white; text-align:center; padding:100px 20px;">
+                        <i class="fas fa-wifi-slash fa-4x" style="margin-bottom:20px; opacity:0.5;"></i>
+                        <h2>Internet Required</h2>
+                        <p>Please connect to the internet and login for the first time to enable offline mode.</p>
+                        <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px; border-radius:10px; border:none;">Retry Connection</button>
+                    </div>`;
             }
         }
 
-        // ३. अफलाइन एटेन्डेन्स लोकल क्यु (Queue) मा राख्ने
+        // ४. अफलाइन एटेन्डेन्स सेभ गर्ने
         function markOffline(type) {
-            const userData = localStorage.getItem('nephr_session_user');
-            if (!userData) return;
-            
-            const user = JSON.parse(userData);
+            const data = localStorage.getItem('nephr_session_user');
+            const user = JSON.parse(data);
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
             
             queue.push({
@@ -84,31 +92,22 @@
             });
 
             localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-            document.getElementById('off-status').innerHTML = "✅ " + (type === 'checkIn' ? 'Check-In' : 'Check-Out') + " saved locally!";
-            alert(type + " recorded successfully (Offline).");
+            document.getElementById('off-status').innerHTML = "✅ " + type + " saved locally!";
+            alert(type + " recorded successfully (Offline Mode).");
         }
 
-        // ४. Apps Script बाट आउने 'Success Login' मेसेज सुन्ने
-        window.addEventListener('message', function(event) {
-            // सुरक्षाको लागि तपाईँको Apps Script को Domain मात्र स्वीकार गर्न सकिन्छ
-            if (event.data.type === 'SAVE_SESSION') {
-                localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
-                console.log("Session details cached for offline use.");
-            }
-        });
-
-        // ५. Service Worker दर्ता (अति आवश्यक - अफलाइनको लागि)
+        // ५. Service Worker दर्ता
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('SW Registered!', reg.scope))
-                .catch(err => console.log('SW Registration Failed!', err));
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('SW Active on scope:', reg.scope);
+                });
             });
         }
 
-        window.addEventListener('online', checkConnectivity);
-        window.addEventListener('offline', checkConnectivity);
-        window.onload = checkConnectivity;
+        window.addEventListener('online', updateConnectivityUI);
+        window.addEventListener('offline', updateConnectivityUI);
+        window.onload = updateConnectivityUI;
     </script>
 </body>
 </html>
