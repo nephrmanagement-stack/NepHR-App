@@ -9,19 +9,20 @@
     <style>
         :root {
             --primary-bg: #508C7F;
-            --card-bg: rgba(255, 255, 255, 0.1);
+            --accent-yellow: #ffeb3b;
             --text-white: #ffffff;
+            --transition: all 0.3s ease;
         }
 
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
             overflow: hidden; background-color: var(--primary-bg); 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
         }
 
         #appFrame { width: 100%; height: 100%; border: none; display: block; }
 
-        /* Attractive Offline UI */
+        /* Modern Offline Screen */
         #offline-screen {
             display: none;
             flex-direction: column;
@@ -30,67 +31,83 @@
             height: 100vh;
             color: var(--text-white);
             text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #508C7F 0%, #3d6b61 100%);
+            padding: 30px;
+            background: linear-gradient(135deg, #508C7F 0%, #355d54 100%);
         }
 
-        .icon-box {
+        .icon-container {
             position: relative;
-            margin-bottom: 30px;
-            animation: pulse 2s infinite;
+            margin-bottom: 40px;
         }
 
-        .main-icon { font-size: 80px; opacity: 0.9; }
-        .small-icon { 
-            position: absolute; bottom: 0; right: -10px; 
-            font-size: 30px; color: #ffeb3b; 
+        .wifi-icon { 
+            font-size: 90px; 
+            opacity: 0.9; 
+            animation: pulse 2s infinite ease-in-out;
         }
 
-        h1 { font-size: 28px; margin: 10px 0; font-weight: 600; }
-        p { font-size: 16px; opacity: 0.8; max-width: 300px; line-height: 1.5; }
+        .warning-icon { 
+            position: absolute; bottom: -5px; right: -15px; 
+            font-size: 35px; color: var(--accent-yellow);
+            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
+        }
+
+        h1 { font-size: 32px; margin: 0 0 15px 0; font-weight: 700; letter-spacing: -0.5px; }
+        p { font-size: 17px; opacity: 0.85; max-width: 320px; line-height: 1.6; margin: 0; }
 
         .retry-btn {
-            margin-top: 40px;
-            padding: 15px 40px;
-            border-radius: 30px;
+            margin-top: 50px;
+            padding: 16px 50px;
+            border-radius: 50px;
             border: none;
             background: white;
             color: var(--primary-bg);
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+            transition: var(--transition);
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-
-        .retry-btn:active { transform: scale(0.95); box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
-
-        .connection-status {
-            position: fixed;
-            bottom: 30px;
-            font-size: 12px;
-            opacity: 0.6;
-            letter-spacing: 1px;
+            gap: 12px;
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
+        .retry-btn:hover { transform: translateY(-3px); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .retry-btn:active { transform: translateY(-1px); }
+
+        .status-footer {
+            position: fixed;
+            bottom: 40px;
+            font-size: 11px;
+            opacity: 0.5;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Animations */
         @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.9; }
+            0% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.7; }
         }
 
-        /* Loading Spinner for Retry */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        /* Spinner */
         .loader {
             border: 3px solid #f3f3f3;
             border-top: 3px solid var(--primary-bg);
             border-radius: 50%;
             width: 18px;
             height: 18px;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
             display: none;
         }
 
@@ -100,24 +117,25 @@
 </head>
 <body>
 
-    <!-- Main NepHR Application -->
+    <!-- Main NepHR App Frame -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxiNhgXHhhEjqZJl9epRs3u5eFR9OU290uB0Ohlc2PkxS-z71GsOFgSshGy37rc-LK5/exec" allow="geolocation; camera"></iframe>
 
-    <!-- Beautiful Offline Screen -->
+    <!-- Attractive English Offline Screen -->
     <div id="offline-screen">
-        <div class="icon-box">
-            <i class="fas fa-wifi main-icon"></i>
-            <i class="fas fa-exclamation-triangle small-icon"></i>
+        <div class="icon-container">
+            <i class="fas fa-wifi wifi-icon"></i>
+            <i class="fas fa-exclamation-circle warning-icon"></i>
         </div>
-        <h1>तपाईं अफलाइन हुनुहुन्छ</h1>
-        <p>NepHR चलाउन इन्टरनेट जडान आवश्यक छ। कृपया आफ्नो वाइफाइ वा डाटा चेक गर्नुहोस्।</p>
+        
+        <h1>You are Offline</h1>
+        <p>It seems you're not connected to the internet. Please check your connection to continue using NepHR.</p>
         
         <button class="retry-btn" onclick="retryConnection()">
             <span class="loader" id="loader"></span>
-            <span id="btn-text">फेरि प्रयास गर्नुहोस्</span>
+            <span id="btn-text">Try Again</span>
         </button>
 
-        <div class="connection-status">No Internet Connection</div>
+        <div class="status-footer">Offline Mode Enabled</div>
     </div>
 
     <script>
@@ -126,7 +144,7 @@
         const loader = document.getElementById('loader');
         const btnText = document.getElementById('btn-text');
 
-        // कनेक्सन चेक गर्ने फङ्सन
+        // Check connectivity and switch UI
         function checkConnectivity() {
             if (navigator.onLine) {
                 frame.style.display = "block";
@@ -137,46 +155,38 @@
             }
         }
 
-        // Retry बटन थिच्दाको लजिक
+        // Animated Retry logic
         function retryConnection() {
-            btnText.innerText = "जाँच गर्दै...";
+            btnText.innerText = "Checking...";
             loader.style.display = "block";
             
+            // Artificial delay for smooth feel
             setTimeout(() => {
                 if (navigator.onLine) {
-                    location.reload(); // अनलाइन भए पेज रिलोड गर्ने
+                    location.reload(); 
                 } else {
                     loader.style.display = "none";
-                    btnText.innerText = "फेरि प्रयास गर्नुहोस्";
-                    // एउटा सानो बम्प एनिमेसन दिने
-                    offlineScreen.style.animation = "none";
-                    void offlineScreen.offsetWidth; 
-                    offlineScreen.style.animation = "shake 0.5s";
+                    btnText.innerText = "Try Again";
+                    // Add shake effect to screen if still offline
+                    offlineScreen.style.animation = "shake 0.5s ease-in-out";
+                    setTimeout(() => { offlineScreen.style.animation = ""; }, 500);
                 }
-            }, 1500);
+            }, 1200);
         }
 
-        // ब्राउजरको अनलाइन/अफलाइन इभेन्ट सुन्ने
+        // Global Event Listeners
         window.addEventListener('online', checkConnectivity);
         window.addEventListener('offline', checkConnectivity);
 
-        // सुरुमा एकपटक चेक गर्ने
+        // Initial Check
         window.onload = checkConnectivity;
 
-        // PWA Service Worker
+        // Register Service Worker for PWA support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => { 
                 navigator.serviceWorker.register('sw.js'); 
             });
         }
     </script>
-
-    <style>
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-    </style>
 </body>
 </html>
