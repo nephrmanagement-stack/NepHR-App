@@ -3,15 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NepHR System</title>
+    <title>NepHR PWA Shell</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body, html { margin:0; padding:0; height:100%; overflow:hidden; }
-        iframe { width:100%; height:100%; border:none; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background-color: #508C7F; font-family: sans-serif; }
+        #appFrame { width: 100%; height: 100%; border: none; display: block; }
+        
+        /* Offline Dashboard UI */
+        #offline-ui { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: white; text-align: center; padding: 20px; }
+        .user-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid white; margin-bottom: 15px; }
+        .btn-group { display: flex; gap: 15px; margin-top: 25px; }
+        .off-btn { padding: 15px 25px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 16px; }
+        .in { background: #28a745; color: white; }
+        .out { background: #dc3545; color: white; }
+        .status-msg { margin-top: 20px; font-size: 14px; opacity: 0.8; }
     </style>
 </head>
 <body>
-    <iframe id="app" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" 
-            allow="geolocation; camera; publickey-credentials-get"></iframe>
+
+    <!-- Online Mode: GAS App Loads Here -->
+    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw93Pk4AqO1uIJTo_HsasFaH6WYaXznAfbJZryeyR0hdLziAnTQsFzcFIDAiugC3ILB/exec" allow="geolocation; camera"></iframe>
+
+    <!-- Offline Mode: UI shows when no Internet -->
+    <div id="offline-ui">
+        <img id="off-user-photo" src="https://placehold.co/80x80/white/508C7F?text=U" class="user-avatar">
+        <h2 id="off-user-name">Welcome Back</h2>
+        <p>You are working <b>Offline</b></p>
+        
+        <div class="btn-group">
+            <button class="off-btn in" onclick="markOffline('checkIn')"><i class="fas fa-sign-in-alt"></i> Check In</button>
+            <button class="off-btn out" onclick="markOffline('checkOut')"><i class="fas fa-sign-out-alt"></i> Check Out</button>
+        </div>
+        <p id="off-status" class="status-msg">Attendance will sync when you're back online.</p>
+    </div>
+
+    <script>
+        const frame = document.getElementById('appFrame');
+        const offlineUI = document.getElementById('offline-ui');
+
+        // १. कनेक्सन चेक गर्ने
+        function checkConnectivity() {
+            if (navigator.onLine) {
+                frame.style.display = "block";
+                offlineUI.style.display = "none";
+            } else {
+                frame.style.display = "none";
+                loadOfflineDashboard();
+            }
+        }
+
+        // २. अफलाइन ड्यासबोर्ड लोड गर्ने
+        function loadOfflineDashboard() {
+            const userData = localStorage.getItem('nephr_session_user');
+            if (userData) {
+                const user = JSON.parse(userData);
+                document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
+                if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
+                offlineUI.style.display = "flex";
+            } else {
+                document.body.innerHTML = "<div style='color:white; text-align:center; padding-top:100px;'><h2>No Internet Connection</h2><p>Please connect to the internet for the first login.</p></div>";
+            }
+        }
+
+        // ३. अफलाइन एटेन्डेन्स सेभ गर्ने
+        function markOffline(type) {
+            const user = JSON.parse(localStorage.getItem('nephr_session_user'));
+            const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
+            
+            queue.push({
+                employeeId: user.employeeId,
+                type: type,
+                timestamp: new Date().getTime()
+            });
+
+            localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
+            document.getElementById('off-status').innerHTML = "✅ " + type + " saved locally!";
+            alert(type + " recorded successfully (Offline).");
+        }
+
+        // ४. Iframe बाट आएको मेसेज सुन्ने (Login Data प्राप्त गर्न)
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'SAVE_SESSION') {
+                localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
+                console.log("Session saved in PWA Shell.");
+            }
+        });
+
+        window.addEventListener('online', checkConnectivity);
+        window.addEventListener('offline', checkConnectivity);
+        window.onload = checkConnectivity;
+    </script>
 </body>
 </html>
