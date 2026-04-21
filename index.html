@@ -21,141 +21,102 @@
 </head>
 <body>
 
-    <!-- Main App Iframe -->
     <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" allow="geolocation; camera"></iframe>
 
-    <!-- Offline Dashboard UI -->
     <div id="offline-ui">
         <img id="off-user-photo" src="https://placehold.co/100x100/white/508C7F?text=User" class="user-avatar">
         <h2 id="off-user-name">Welcome</h2>
-        <p style="opacity: 0.9;">You are currently in <b>Offline Mode</b></p>
-        
+        <p style="opacity: 0.9;">Offline Mode</p>
         <div class="btn-group">
-            <button class="off-btn in" onclick="markOffline('Check-In')">
-                <i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span>
-            </button>
-            <button class="off-btn out" onclick="markOffline('Check-Out')">
-                <i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span>
-            </button>
+            <button class="off-btn in" onclick="markOffline('Check-In')"><i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span></button>
+            <button class="off-btn out" onclick="markOffline('Check-Out')"><i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span></button>
         </div>
-        <p id="off-status" class="status-msg">Offline attendance will sync when online.</p>
+        <p id="off-status" class="status-msg">Waiting for offline input...</p>
+        <button onclick="location.reload()" style="margin-top:20px; background:none; border:1px solid white; color:white; padding:5px 15px; border-radius:15px; font-size:12px; cursor:pointer;">Retry / Reload</button>
     </div>
 
-    <!-- Sync Feedback Toast -->
-    <div id="sync-toast">✅ Syncing Data...</div>
+    <div id="sync-toast">✅ Syncing...</div>
 
     <script>
         const frame = document.getElementById('appFrame');
         const offlineUI = document.getElementById('offline-ui');
         const toast = document.getElementById('sync-toast');
 
-        // १. Google Apps Script (Iframe) बाट आउने मेसेजहरू सुन्ने
+        // १. Iframe बाट मेसेज सुन्ने
         window.addEventListener('message', function(event) {
-            console.log("[PWA Shell] Message received:", event.data.type);
-            
-            // सेसन सेभ गर्ने (अफलाइन मोडमा युजर चिन्नको लागि)
             if (event.data && event.data.type === 'SAVE_SESSION') {
-                localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
-                if (navigator.onLine) {
-                    showToast("✅ Offline Mode Ready!");
-                }
+                const userData = JSON.stringify(event.data.user);
+                localStorage.setItem('nephr_session_user', userData);
+                console.log("Session saved to Shell:", userData);
+                showToast("✅ Login Data Secured for Offline");
             }
             
-            // सिंक सफल भएपछि LocalStorage खाली गर्ने
             if (event.data.type === 'SYNC_SUCCESS') {
                 localStorage.setItem('OFFLINE_QUEUE', '[]');
-                document.getElementById('off-status').innerHTML = "✅ All data synced!";
-                showToast("✅ Attendance Synced to Server!");
-                console.log("Offline records cleared.");
+                document.getElementById('off-status').innerHTML = "✅ Synced to Server!";
+                showToast("✅ All Data Synced!");
             }
         });
 
-        // २. कनेक्सन अनुसार UI बदल्ने (Main Logic)
+        // २. कनेक्सन अनुसार UI बदल्ने
         function updateConnectivityUI() {
             if (navigator.onLine) {
                 frame.style.display = "block";
                 offlineUI.style.display = "none";
-                // अनलाइन आउने बित्तिकै ३ सेकेन्ड पर्खेर सिंक ट्रिगर गर्ने
-                setTimeout(triggerSyncIfOnline, 3000);
+                setTimeout(triggerSyncIfOnline, 5000); // ५ सेकेन्डपछि सिंक सुरु गर्ने
             } else {
                 frame.style.display = "none";
                 const data = localStorage.getItem('nephr_session_user');
                 if (data) {
                     const user = JSON.parse(data);
-                    document.getElementById('off-user-name').innerText = "Hello, " + (user.fullName || "User");
+                    document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
                     if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
                     offlineUI.style.display = "flex";
                 } else {
-                    document.body.innerHTML = `
-                        <div style='color:white; text-align:center; padding:100px 20px;'>
-                            <i class='fas fa-wifi-slash fa-4x' style='margin-bottom:20px; opacity:0.6;'></i>
-                            <h2>First Login Required</h2>
-                            <p>Please connect to the internet and login once to enable offline mode.</p>
-                            <button onclick='location.reload()' style='padding:10px 20px; border-radius:10px; border:none; cursor:pointer;'>Retry</button>
-                        </div>`;
+                    // यदि डाटै छैन भने अलि स्पष्ट म्यासेज
+                    document.getElementById('off-user-name').innerText = "First Login Required";
+                    document.getElementById('off-status').innerHTML = "कृपया एकपटक अनलाइनमा लगइन गर्नुहोस्।";
+                    offlineUI.style.display = "flex";
                 }
             }
         }
 
-        // ३. अफलाइन एटेन्डेन्स रेकर्ड गर्ने (Queue मा राख्ने)
         function markOffline(type) {
             const data = localStorage.getItem('nephr_session_user');
             if (!data) {
-                alert("Please login while online first!");
+                alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस्।");
                 return;
             }
-            
             const user = JSON.parse(data);
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
-            
-            // Backend ले बुझ्ने format मा डाटा मिलाउने
-            queue.push({
-                employeeId: user.employeeId,
-                type: type === 'Check-In' ? 'checkIn' : 'checkOut',
-                timestamp: new Date().getTime() 
-            });
-
+            queue.push({ employeeId: user.employeeId, type: type === 'Check-In' ? 'checkIn' : 'checkOut', timestamp: Date.now() });
             localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-            document.getElementById('off-status').innerHTML = "✅ " + type + " saved locally.";
-            alert("Offline " + type + " recorded successfully!");
+            document.getElementById('off-status').innerHTML = "✅ " + type + " saved offline.";
+            alert(type + " recorded locally.");
         }
 
-        // ४. अनलाइन हुँदा जम्मा भएको डाटा GAS लाई पठाउने
         function triggerSyncIfOnline() {
             if (!navigator.onLine) return;
-
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
             if (queue.length > 0) {
-                console.log("Triggering Sync for " + queue.length + " items...");
-                showToast("🔄 Syncing offline records...");
-                frame.contentWindow.postMessage({
-                    type: 'PROCESS_SYNC',
-                    data: queue
-                }, "*");
+                showToast("🔄 Syncing " + queue.length + " records...");
+                frame.contentWindow.postMessage({ type: 'PROCESS_SYNC', data: queue }, "*");
             }
         }
 
-        // ५. उपयोगी साना फङ्सनहरू
         function showToast(msg) {
             toast.innerText = msg;
             toast.style.display = "block";
             setTimeout(() => { toast.style.display = "none"; }, 4000);
         }
 
-        // ६. Service Worker दर्ता
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { 
-                navigator.serviceWorker.register('sw.js').then(reg => {
-                    console.log('SW Registered.');
-                }).catch(err => console.log('SW Failed.', err));
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
         }
 
-        // इभेन्ट लिस्टनर्स
         window.addEventListener('online', updateConnectivityUI);
         window.addEventListener('offline', updateConnectivityUI);
         window.onload = updateConnectivityUI;
-
     </script>
 </body>
 </html>
