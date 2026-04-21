@@ -15,7 +15,7 @@
         .off-btn { padding: 20px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; font-size: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 130px; background: white; }
         .in { color: #2e7d32; } .out { color: #c62828; }
         .status-msg { margin-top: 25px; font-size: 14px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
-        #sync-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 25px; border-radius: 30px; display: none; font-size: 13px; z-index: 10000; }
+        #sync-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 25px; border-radius: 30px; display: none; font-size: 13px; z-index: 10000; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -25,46 +25,41 @@
     <div id="offline-ui">
         <img id="off-user-photo" src="https://placehold.co/100x100/white/508C7F?text=User" class="user-avatar">
         <h2 id="off-user-name">Welcome</h2>
+        <p id="off-status-msg">Offline Mode Active</p>
         <div class="btn-group">
             <button class="off-btn in" onclick="markOffline('Check-In')"><i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span></button>
             <button class="off-btn out" onclick="markOffline('Check-Out')"><i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span></button>
         </div>
-        <p id="off-status" class="status-msg">Offline Mode Active</p>
-        <button onclick="manualFix()" style="margin-top:20px; background:none; border:none; color:white; opacity:0.5; text-decoration:underline; font-size:12px;">Settings</button>
+        <p id="off-info" class="status-msg">Please wait while we secure your session...</p>
     </div>
 
-    <div id="sync-toast">🔄 Syncing to Server...</div>
+    <div id="sync-toast">Syncing...</div>
 
     <script>
         const frame = document.getElementById('appFrame');
         const offlineUI = document.getElementById('offline-ui');
         const toast = document.getElementById('sync-toast');
 
-        // १. GAS बाट आउने सूचना सुन्ने
+        // १. Iframe सँग कुराकानी गर्ने लजिक
         window.addEventListener('message', function(event) {
-            // A. GAS तयार छ, सेसन सेभ गर र सिंक सुरु गर
-            if (event.data && event.data.type === 'GAS_READY_FOR_SYNC') {
-                console.log("Handshake received from GAS.");
-                
-                // सेसन सेभ गर्ने
-                if (event.data.user) {
-                    localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
-                    console.log("Session stored.");
-                }
-
-                // डाटा सिंक सुरु गर्ने
-                const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
-                if (queue.length > 0) {
-                    showToast("🔄 Syncing " + queue.length + " offline records...");
-                    frame.contentWindow.postMessage({ type: 'PROCESS_SYNC', data: queue }, "*");
+            // Iframe ले लगइन डाटा पठायो भने सेभ गर्ने
+            if (event.data && event.data.type === 'SESSION_BROADCAST') {
+                const user = event.data.user;
+                if (user && user.employeeId) {
+                    localStorage.setItem('nephr_session_user', JSON.stringify(user));
+                    console.log("✅ PWA: Session Captured for " + user.fullName);
+                    document.getElementById('off-info').innerText = "✅ Session Verified! Offline ready.";
+                    
+                    // यदि अनलाइन छ भने तुरुन्तै सिंक ट्रिगर गर्ने
+                    if (navigator.onLine) triggerSync();
                 }
             }
             
-            // B. सिंक सफल भयो, लोकल डाटा हटाउ
-            if (event.data.type === 'SYNC_SUCCESS') {
+            // सिंक सफल भएपछि लोकल डाटा खाली गर्ने
+            if (event.data && event.data.type === 'SYNC_SUCCESS') {
                 localStorage.setItem('OFFLINE_QUEUE', '[]');
-                document.getElementById('off-status').innerHTML = "✅ All data synced to server!";
-                showToast("✅ Successfully Synced!");
+                document.getElementById('off-info').innerText = "✅ Data synced to server!";
+                showToast("✅ Attendance Synced successfully!");
             }
         });
 
@@ -73,30 +68,33 @@
             if (navigator.onLine) {
                 frame.style.display = "block";
                 offlineUI.style.display = "none";
+                // Iframe लोड हुन समय दिने
+                setTimeout(triggerSync, 6000); 
             } else {
                 frame.style.display = "none";
                 offlineUI.style.display = "flex";
                 
-                const data = localStorage.getItem('nephr_session_user');
-                if (data) {
-                    const user = JSON.parse(data);
+                const savedUser = localStorage.getItem('nephr_session_user');
+                if (savedUser && savedUser !== "undefined") {
+                    const user = JSON.parse(savedUser);
                     document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
+                    document.getElementById('off-info').innerText = "You are currently offline.";
                     if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
                 } else {
                     document.getElementById('off-user-name').innerText = "Login Required";
-                    document.getElementById('off-status').innerHTML = "कृपया एकपटक अनलाइनमा लगइन गर्नुहोस्।";
+                    document.getElementById('off-info').innerText = "कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस्।";
                 }
             }
         }
 
-        // ३. अफलाइन बटन थिच्दा डाटा सेभ गर्ने
+        // ३. अफलाइन एटेन्डेन्स सेभ गर्ने
         function markOffline(type) {
-            const data = localStorage.getItem('nephr_session_user');
-            if (!data) {
-                alert("लगइन डाटा छैन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस्।");
+            const savedUser = localStorage.getItem('nephr_session_user');
+            if (!savedUser || savedUser === "undefined") {
+                alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा लगइन गर्नुहोस् र ड्यासबोर्डमा १० सेकेन्ड बस्नुहोस्।");
                 return;
             }
-            const user = JSON.parse(data);
+            const user = JSON.parse(savedUser);
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
             
             queue.push({
@@ -106,16 +104,16 @@
             });
 
             localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-            document.getElementById('off-status').innerHTML = "✅ " + type + " saved locally.";
-            alert(type + " recorded locally. It will sync when you go online.");
+            document.getElementById('off-info').innerText = "✅ " + type + " saved offline.";
+            alert(type + " recorded offline. It will sync automatically.");
         }
 
-        function manualFix() {
-            const id = prompt("तपाईंको Employee ID (e.g. EMP-123):");
-            if(id) {
-                const name = prompt("तपाईंको नाम:");
-                localStorage.setItem('nephr_session_user', JSON.stringify({employeeId: id, fullName: name}));
-                location.reload();
+        function triggerSync() {
+            const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
+            if (queue.length > 0 && navigator.onLine) {
+                console.log("PWA: Sending " + queue.length + " items to GAS for sync.");
+                showToast("🔄 Syncing offline data...");
+                frame.contentWindow.postMessage({ type: 'PROCESS_SYNC', data: queue }, "*");
             }
         }
 
