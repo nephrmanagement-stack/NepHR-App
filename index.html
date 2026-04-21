@@ -16,6 +16,7 @@
         .in { background: #ffffff; color: #2e7d32; }
         .out { background: #ffffff; color: #c62828; }
         .status-msg { margin-top: 25px; font-size: 14px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
+        #sync-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 5px; display: none; font-size: 13px; z-index: 10000; }
     </style>
 </head>
 <body>
@@ -24,90 +25,72 @@
 
     <div id="offline-ui">
         <img id="off-user-photo" src="https://placehold.co/100x100/white/508C7F?text=User" class="user-avatar">
-        <h2 id="off-user-name">Welcome Back</h2>
-        <p style="opacity: 0.9;">You are currently in <b>Offline Mode</b></p>
-        
+        <h2 id="off-user-name">Welcome</h2>
+        <p>Offline Mode</p>
         <div class="btn-group">
             <button class="off-btn in" onclick="markOffline('Check-In')"><i class="fas fa-sign-in-alt fa-2x"></i><span>Check In</span></button>
             <button class="off-btn out" onclick="markOffline('Check-Out')"><i class="fas fa-sign-out-alt fa-2x"></i><span>Check Out</span></button>
         </div>
-        <p id="off-status" class="status-msg">Offline attendance will sync when online.</p>
+        <p id="off-status" class="status-msg">Ready to save attendance offline.</p>
     </div>
+
+    <div id="sync-toast">✅ Offline Mode Ready!</div>
 
     <script>
         const frame = document.getElementById('appFrame');
         const offlineUI = document.getElementById('offline-ui');
+        const toast = document.getElementById('sync-toast');
 
-        // १. Apps Script बाट आउने लगइन डाटा सुन्ने (Listen)
+        // १. Iframe बाट डाटा प्राप्त गर्ने
         window.addEventListener('message', function(event) {
-            console.log("[PWA Shell] Message received from Iframe:", event.data);
-            
             if (event.data && event.data.type === 'SAVE_SESSION') {
                 localStorage.setItem('nephr_session_user', JSON.stringify(event.data.user));
-                console.log("[PWA Shell] User session saved to LocalStorage!");
+                
+                // युजरलाई जानकारी दिने कि अब अफलाइन चलाउन मिल्छ
+                if (navigator.onLine) {
+                    toast.style.display = "block";
+                    setTimeout(() => { toast.style.display = "none"; }, 3000);
+                }
             }
         });
 
-        // २. कनेक्सन अनुसार UI बदल्ने
-        function updateConnectivityUI() {
+        // २. कनेक्सन चेक गर्ने
+        function updateUI() {
             if (navigator.onLine) {
                 frame.style.display = "block";
                 offlineUI.style.display = "none";
             } else {
                 frame.style.display = "none";
-                showOfflineDashboard();
+                const data = localStorage.getItem('nephr_session_user');
+                if (data) {
+                    const user = JSON.parse(data);
+                    document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
+                    if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
+                    offlineUI.style.display = "flex";
+                } else {
+                    // यदि डाटा छैन भने मात्र यो म्यासेज देखाउने
+                    document.body.innerHTML = "<div style='color:white; text-align:center; padding:100px;'><h2>First Login Required</h2><p>Please login while online to enable offline mode.</p><button onclick='location.reload()'>Retry</button></div>";
+                }
             }
         }
 
-        // ३. अफलाइन ड्यासबोर्ड देखाउने
-        function showOfflineDashboard() {
-            const data = localStorage.getItem('nephr_session_user');
-            if (data) {
-                const user = JSON.parse(data);
-                document.getElementById('off-user-name').innerText = "Hello, " + user.fullName;
-                if(user.photoUrl) document.getElementById('off-user-photo').src = user.photoUrl;
-                offlineUI.style.display = "flex";
-            } else {
-                // यदि डाटा छैन भने (पहिलो पटक लगइन नभएको)
-                document.body.innerHTML = `
-                    <div style="color:white; text-align:center; padding:100px 20px;">
-                        <i class="fas fa-wifi-slash fa-4x" style="margin-bottom:20px; opacity:0.5;"></i>
-                        <h2>Internet Required</h2>
-                        <p>Please connect to the internet and login for the first time to enable offline mode.</p>
-                        <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px; border-radius:10px; border:none;">Retry Connection</button>
-                    </div>`;
-            }
-        }
-
-        // ४. अफलाइन एटेन्डेन्स सेभ गर्ने
         function markOffline(type) {
             const data = localStorage.getItem('nephr_session_user');
             const user = JSON.parse(data);
             const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
-            
-            queue.push({
-                employeeId: user.employeeId,
-                type: type,
-                timestamp: new Date().getTime()
-            });
-
+            queue.push({ employeeId: user.employeeId, type: type, timestamp: Date.now() });
             localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-            document.getElementById('off-status').innerHTML = "✅ " + type + " saved locally!";
-            alert(type + " recorded successfully (Offline Mode).");
+            document.getElementById('off-status').innerHTML = "✅ Saved: " + type;
+            alert(type + " recorded offline!");
         }
 
-        // ५. Service Worker दर्ता
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').then(reg => {
-                    console.log('SW Active on scope:', reg.scope);
-                });
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
         }
 
-        window.addEventListener('online', updateConnectivityUI);
-        window.addEventListener('offline', updateConnectivityUI);
-        window.onload = updateConnectivityUI;
+        window.addEventListener('online', updateUI);
+        window.addEventListener('offline', updateUI);
+        window.onload = updateUI;
     </script>
 </body>
 </html>
