@@ -9,20 +9,18 @@
     <style>
         :root {
             --primary-bg: #508C7F;
-            --accent-yellow: #ffeb3b;
             --text-white: #ffffff;
-            --transition: all 0.3s ease;
         }
 
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
             overflow: hidden; background-color: var(--primary-bg); 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
         }
 
         #appFrame { width: 100%; height: 100%; border: none; display: block; }
 
-        /* Modern Offline Screen */
+        /* Khatra Animated Offline UI */
         #offline-screen {
             display: none;
             flex-direction: column;
@@ -31,111 +29,116 @@
             height: 100vh;
             color: var(--text-white);
             text-align: center;
-            padding: 30px;
-            background: linear-gradient(135deg, #508C7F 0%, #355d54 100%);
+            padding: 20px;
+            background: radial-gradient(circle, #508C7F 0%, #355d54 100%);
         }
 
-        .icon-container {
+        /* Signal Wave Animation Logic */
+        .icon-wrapper {
             position: relative;
-            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 50px;
         }
 
-        .wifi-icon { 
-            font-size: 90px; 
-            opacity: 0.9; 
-            animation: pulse 2s infinite ease-in-out;
+        .wifi-base {
+            font-size: 80px;
+            z-index: 5;
+            position: relative;
+            animation: bounce 2s infinite ease-in-out;
         }
 
-        .warning-icon { 
-            position: absolute; bottom: -5px; right: -15px; 
-            font-size: 35px; color: var(--accent-yellow);
-            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
+        .wave {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            animation: ripple 2s infinite linear;
+            opacity: 0;
         }
 
-        h1 { font-size: 32px; margin: 0 0 15px 0; font-weight: 700; letter-spacing: -0.5px; }
-        p { font-size: 17px; opacity: 0.85; max-width: 320px; line-height: 1.6; margin: 0; }
+        .wave:nth-child(2) { animation-delay: 0.5s; }
+        .wave:nth-child(3) { animation-delay: 1s; }
+
+        @keyframes ripple {
+            0% { width: 80px; height: 80px; opacity: 0.8; }
+            100% { width: 220px; height: 220px; opacity: 0; }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        h1 { font-size: 30px; margin: 10px 0; font-weight: 700; }
+        p { font-size: 17px; opacity: 0.8; max-width: 320px; line-height: 1.5; margin-bottom: 30px; }
 
         .retry-btn {
-            margin-top: 50px;
-            padding: 16px 50px;
-            border-radius: 50px;
+            padding: 16px 45px;
+            border-radius: 35px;
             border: none;
             background: white;
             color: var(--primary-bg);
             font-size: 16px;
-            font-weight: 700;
+            font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
-            transition: var(--transition);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 12px;
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
-        .retry-btn:hover { transform: translateY(-3px); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-        .retry-btn:active { transform: translateY(-1px); }
+        .retry-btn:hover { transform: scale(1.05); }
+        .retry-btn:active { transform: scale(0.95); }
 
-        .status-footer {
-            position: fixed;
-            bottom: 40px;
-            font-size: 11px;
-            opacity: 0.5;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        /* Animations */
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.08); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.7; }
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-8px); }
-            40%, 80% { transform: translateX(8px); }
-        }
-
-        /* Spinner */
+        /* Success Spinner */
         .loader {
             border: 3px solid #f3f3f3;
             border-top: 3px solid var(--primary-bg);
             border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            animation: spin 0.8s linear infinite;
+            width: 18px; height: 18px;
+            animation: spin 1s linear infinite;
             display: none;
         }
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        .footer-tag {
+            position: absolute;
+            bottom: 30px;
+            font-size: 12px;
+            opacity: 0.5;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
     </style>
 </head>
 <body>
 
-    <!-- Main NepHR App Frame -->
-    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbxiNhgXHhhEjqZJl9epRs3u5eFR9OU290uB0Ohlc2PkxS-z71GsOFgSshGy37rc-LK5/exec" allow="geolocation; camera"></iframe>
+    <!-- Main Application Iframe -->
+    <iframe id="appFrame" src="https://script.google.com/macros/s/AKfycbw4SHBZ_10GT-fwKkDuO57qaib40_RBa0fEzPvOumrvqUsyvSr_sJm4kWlul1AwoNk1/exec" allow="geolocation; camera"></iframe>
 
-    <!-- Attractive English Offline Screen -->
+    <!-- Khatra Offline UI -->
     <div id="offline-screen">
-        <div class="icon-container">
-            <i class="fas fa-wifi wifi-icon"></i>
-            <i class="fas fa-exclamation-circle warning-icon"></i>
+        <div class="icon-wrapper">
+            <div class="wave"></div>
+            <div class="wave"></div>
+            <div class="wave"></div>
+            <i class="fas fa-wifi wifi-base"></i>
         </div>
-        
-        <h1>You are Offline</h1>
-        <p>It seems you're not connected to the internet. Please check your connection to continue using NepHR.</p>
+
+        <h1>Offline Connection</h1>
+        <p>No internet connection found. Please check your WiFi or mobile data to access NepHR.</p>
         
         <button class="retry-btn" onclick="retryConnection()">
             <span class="loader" id="loader"></span>
-            <span id="btn-text">Try Again</span>
+            <span id="btn-text">Retry Connection</span>
         </button>
 
-        <div class="status-footer">Offline Mode Enabled</div>
+        <div class="footer-tag">Connectivity Status: Disconnected</div>
     </div>
 
     <script>
@@ -144,8 +147,7 @@
         const loader = document.getElementById('loader');
         const btnText = document.getElementById('btn-text');
 
-        // Check connectivity and switch UI
-        function checkConnectivity() {
+        function checkStatus() {
             if (navigator.onLine) {
                 frame.style.display = "block";
                 offlineScreen.style.display = "none";
@@ -155,38 +157,40 @@
             }
         }
 
-        // Animated Retry logic
         function retryConnection() {
             btnText.innerText = "Checking...";
             loader.style.display = "block";
             
-            // Artificial delay for smooth feel
             setTimeout(() => {
                 if (navigator.onLine) {
                     location.reload(); 
                 } else {
                     loader.style.display = "none";
-                    btnText.innerText = "Try Again";
-                    // Add shake effect to screen if still offline
-                    offlineScreen.style.animation = "shake 0.5s ease-in-out";
-                    setTimeout(() => { offlineScreen.style.animation = ""; }, 500);
+                    btnText.innerText = "Retry Connection";
+                    // Alert with shake
+                    offlineScreen.style.animation = "shake 0.4s";
+                    setTimeout(() => offlineScreen.style.animation = "", 400);
                 }
-            }, 1200);
+            }, 1500);
         }
 
-        // Global Event Listeners
-        window.addEventListener('online', checkConnectivity);
-        window.addEventListener('offline', checkConnectivity);
+        window.addEventListener('online', checkStatus);
+        window.addEventListener('offline', checkStatus);
+        window.onload = checkStatus;
 
-        // Initial Check
-        window.onload = checkConnectivity;
-
-        // Register Service Worker for PWA support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => { 
                 navigator.serviceWorker.register('sw.js'); 
             });
         }
     </script>
+
+    <style>
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+    </style>
 </body>
 </html>
