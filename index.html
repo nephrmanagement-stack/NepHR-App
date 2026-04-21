@@ -82,18 +82,45 @@
         }
 
         function markOffline(type) {
-            const data = localStorage.getItem('nephr_session_user');
-            if (!data) {
-                alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस्।");
-                return;
-            }
-            const user = JSON.parse(data);
-            const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
-            queue.push({ employeeId: user.employeeId, type: type === 'Check-In' ? 'checkIn' : 'checkOut', timestamp: Date.now() });
-            localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
-            document.getElementById('off-status').innerHTML = "✅ " + type + " saved offline.";
-            alert(type + " recorded locally.");
+    // १. LocalStorage बाट डाटा तान्ने
+    const rawData = localStorage.getItem('nephr_session_user');
+    
+    // २. यदि डाटा छैन भने एरर म्यासेज देखाउने
+    if (!rawData || rawData === "undefined" || rawData === "null") {
+        alert("लगइन डाटा भेटिएन! कृपया अनलाइन हुँदा एकपटक लगइन गर्नुहोस् र १० सेकेन्ड पर्खिनुहोस्।");
+        return;
+    }
+
+    try {
+        const user = JSON.parse(rawData);
+        
+        // डाटा चेक गर्ने
+        if (!user || !user.employeeId) {
+            alert("त्रुटि: युजरको जानकारी अपूर्ण छ। कृपया फेरि लगइन गर्नुहोस्।");
+            return;
         }
+
+        const queue = JSON.parse(localStorage.getItem('OFFLINE_QUEUE') || '[]');
+        
+        // ३. क्युमा डाटा थप्ने
+        queue.push({
+            employeeId: user.employeeId,
+            type: type === 'Check-In' ? 'checkIn' : 'checkOut',
+            timestamp: new Date().getTime()
+        });
+
+        // ४. सेभ गर्ने
+        localStorage.setItem('OFFLINE_QUEUE', JSON.stringify(queue));
+        
+        // ५. UI अपडेट गर्ने
+        document.getElementById('off-status').innerHTML = "✅ " + type + " स्थानीय रूपमा सुरक्षित भयो।";
+        alert(type + " रेकर्ड भयो! इन्टरनेट आएपछि यो स्वतः सिंक हुनेछ।");
+
+    } catch (e) {
+        console.error("Offline Recording Error:", e);
+        alert("सिस्टममा केही समस्या आयो। कृपया रिफ्रेस गर्नुहोस्।");
+    }
+}
 
         function triggerSyncIfOnline() {
             if (!navigator.onLine) return;
